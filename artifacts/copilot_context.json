@@ -1,0 +1,273 @@
+{
+  "total_incidents": 8173,
+  "date_range": "2023-11-09 19:24:48.154000+00:00 to 2024-04-08 17:11:42.780000+00:00",
+  "hourly_distribution": [
+    {
+      "hour": 0,
+      "count": 418,
+      "closure_rate": 0.07655502392344497,
+      "high_priority_rate": 0.6507177033492823
+    },
+    {
+      "hour": 1,
+      "count": 381,
+      "closure_rate": 0.047244094488188976,
+      "high_priority_rate": 0.6325459317585301
+    },
+    {
+      "hour": 2,
+      "count": 387,
+      "closure_rate": 0.06718346253229975,
+      "high_priority_rate": 0.661498708010336
+    },
+    {
+      "hour": 3,
+      "count": 372,
+      "closure_rate": 0.05913978494623656,
+      "high_priority_rate": 0.6155913978494624
+    },
+    {
+      "hour": 4,
+      "count": 558,
+      "closure_rate": 0.05555555555555555,
+      "high_priority_rate": 0.6559139784946236
+    },
+    {
+      "hour": 5,
+      "count": 661,
+      "closure_rate": 0.07261724659606657,
+      "high_priority_rate": 0.6656580937972768
+    },
+    {
+      "hour": 6,
+      "count": 660,
+      "closure_rate": 0.10606060606060606,
+      "high_priority_rate": 0.546969696969697
+    },
+    {
+      "hour": 7,
+      "count": 480,
+      "closure_rate": 0.09583333333333334,
+      "high_priority_rate": 0.5729166666666666
+    },
+    {
+      "hour": 8,
+      "count": 327,
+      "closure_rate": 0.06422018348623854,
+      "high_priority_rate": 0.6146788990825688
+    },
+    {
+      "hour": 9,
+      "count": 160,
+      "closure_rate": 0.06875,
+      "high_priority_rate": 0.625
+    },
+    {
+      "hour": 10,
+      "count": 68,
+      "closure_rate": 0.14705882352941177,
+      "high_priority_rate": 0.5441176470588235
+    },
+    {
+      "hour": 11,
+      "count": 68,
+      "closure_rate": 0.22058823529411764,
+      "high_priority_rate": 0.5882352941176471
+    },
+    {
+      "hour": 12,
+      "count": 179,
+      "closure_rate": 0.5251396648044693,
+      "high_priority_rate": 0.4972067039106145
+    },
+    {
+      "hour": 13,
+      "count": 33,
+      "closure_rate": 0.24242424242424243,
+      "high_priority_rate": 0.6363636363636364
+    },
+    {
+      "hour": 14,
+      "count": 13,
+      "closure_rate": 0.0,
+      "high_priority_rate": 0.5384615384615384
+    },
+    {
+      "hour": 15,
+      "count": 9,
+      "closure_rate": 0.1111111111111111,
+      "high_priority_rate": 0.6666666666666666
+    },
+    {
+      "hour": 16,
+      "count": 9,
+      "closure_rate": 0.3333333333333333,
+      "high_priority_rate": 0.5555555555555556
+    },
+    {
+      "hour": 17,
+      "count": 34,
+      "closure_rate": 0.17647058823529413,
+      "high_priority_rate": 0.6176470588235294
+    },
+    {
+      "hour": 18,
+      "count": 228,
+      "closure_rate": 0.08771929824561403,
+      "high_priority_rate": 0.706140350877193
+    },
+    {
+      "hour": 19,
+      "count": 578,
+      "closure_rate": 0.0657439446366782,
+      "high_priority_rate": 0.6816608996539792
+    },
+    {
+      "hour": 20,
+      "count": 681,
+      "closure_rate": 0.04698972099853157,
+      "high_priority_rate": 0.6828193832599119
+    },
+    {
+      "hour": 21,
+      "count": 810,
+      "closure_rate": 0.06790123456790123,
+      "high_priority_rate": 0.5753086419753086
+    },
+    {
+      "hour": 22,
+      "count": 564,
+      "closure_rate": 0.05319148936170213,
+      "high_priority_rate": 0.5709219858156028
+    },
+    {
+      "hour": 23,
+      "count": 495,
+      "closure_rate": 0.07878787878787878,
+      "high_priority_rate": 0.5151515151515151
+    }
+  ],
+  "cause_distribution": [
+    {
+      "event_cause": "Debris",
+      "count": 12,
+      "closure_rate": 0.08333333333333333,
+      "high_priority_rate": 0.6666666666666666,
+      "avg_resolution": 22978.187908225
+    },
+    {
+      "event_cause": "Fog / Low Visibility",
+      "count": 2,
+      "closure_rate": 0.0,
+      "high_priority_rate": 0.5,
+      "avg_resolution": NaN
+    },
+    {
+      "event_cause": "accident",
+      "count": 365,
+      "closure_rate": 0.030136986301369864,
+      "high_priority_rate": 0.4602739726027397,
+      "avg_resolution": 41.37271345
+    },
+    {
+      "event_cause": "congestion",
+      "count": 136,
+      "closure_rate": 0.04411764705882353,
+      "high_priority_rate": 0.6911764705882353,
+      "avg_resolution": 71.53531281666667
+    },
+    {
+      "event_cause": "construction",
+      "count": 480,
+      "closure_rate": 0.26458333333333334,
+      "high_priority_rate": 0.6291666666666667,
+      "avg_resolution": 1897.86964235
+    },
+    {
+      "event_cause": "debris",
+      "count": 1,
+      "closure_rate": 1.0,
+      "high_priority_rate": 1.0,
+      "avg_resolution": NaN
+    },
+    {
+      "event_cause": "others",
+      "count": 638,
+      "closure_rate": 0.08620689655172414,
+      "high_priority_rate": 0.5956112852664577,
+      "avg_resolution": 235.79430155
+    },
+    {
+      "event_cause": "pot_holes",
+      "count": 537,
+      "closure_rate": 0.024208566108007448,
+      "high_priority_rate": 0.5567970204841713,
+      "avg_resolution": 5784.140804183333
+    },
+    {
+      "event_cause": "procession",
+      "count": 72,
+      "closure_rate": 0.2638888888888889,
+      "high_priority_rate": 0.3194444444444444,
+      "avg_resolution": 36.537950349999996
+    },
+    {
+      "event_cause": "protest",
+      "count": 15,
+      "closure_rate": 0.4,
+      "high_priority_rate": 0.4,
+      "avg_resolution": 24.454272316666668
+    },
+    {
+      "event_cause": "public_event",
+      "count": 84,
+      "closure_rate": 0.4642857142857143,
+      "high_priority_rate": 0.5,
+      "avg_resolution": NaN
+    },
+    {
+      "event_cause": "road_conditions",
+      "count": 170,
+      "closure_rate": 0.12352941176470589,
+      "high_priority_rate": 0.5470588235294118,
+      "avg_resolution": 6228.580967216667
+    },
+    {
+      "event_cause": "test_demo",
+      "count": 3,
+      "closure_rate": 0.0,
+      "high_priority_rate": 0.3333333333333333,
+      "avg_resolution": 1.8238433749999996
+    },
+    {
+      "event_cause": "tree_fall",
+      "count": 284,
+      "closure_rate": 0.39436619718309857,
+      "high_priority_rate": 0.3274647887323944,
+      "avg_resolution": 625.2399286
+    },
+    {
+      "event_cause": "vehicle_breakdown",
+      "count": 4896,
+      "closure_rate": 0.0428921568627451,
+      "high_priority_rate": 0.661968954248366,
+      "avg_resolution": 41.102746491666664
+    },
+    {
+      "event_cause": "vip_movement",
+      "count": 20,
+      "closure_rate": 0.8,
+      "high_priority_rate": 0.35,
+      "avg_resolution": NaN
+    },
+    {
+      "event_cause": "water_logging",
+      "count": 458,
+      "closure_rate": 0.0851528384279476,
+      "high_priority_rate": 0.5917030567685589,
+      "avg_resolution": 2662.3655039333335
+    }
+  ],
+  "corridors": 22,
+  "police_stations": 54
+}

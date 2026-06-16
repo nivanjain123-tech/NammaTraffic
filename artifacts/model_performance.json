@@ -1,0 +1,44 @@
+{
+  "severity_model": {
+    "type": "CatBoost Classifier",
+    "target": "priority (High=1, Low=0)",
+    "metric": "F1 Score",
+    "cv_mean": 0.9988,
+    "cv_std": 0.0004,
+    "fold_scores": [
+      0.9985,
+      0.9995,
+      0.999,
+      0.9985,
+      0.9985
+    ]
+  },
+  "closure_model": {
+    "type": "LightGBM Classifier",
+    "target": "requires_road_closure (1/0)",
+    "metric": "ROC AUC",
+    "cv_mean": 0.796,
+    "cv_std": 0.0113,
+    "fold_scores": [
+      0.7896,
+      0.7799,
+      0.7993,
+      0.8141,
+      0.7973
+    ]
+  },
+  "resolution_model": {
+    "type": "CatBoost Regressor",
+    "target": "resolution_minutes (log-transformed)",
+    "metric": "MAE (minutes)",
+    "cv_mean": 2268.8,
+    "cv_std": 132.6,
+    "fold_scores": [
+      2321.6,
+      2046.3,
+      2457.1,
+      2258.1,
+      2261.2
+    ]
+  }
+}

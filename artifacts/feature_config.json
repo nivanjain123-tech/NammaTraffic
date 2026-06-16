@@ -1,0 +1,44 @@
+{
+  "categorical_features": [
+    "event_type",
+    "event_cause_grouped",
+    "corridor_grouped",
+    "veh_type_clean"
+  ],
+  "numerical_features": [
+    "latitude",
+    "longitude",
+    "hour",
+    "day_of_week",
+    "month",
+    "is_weekend",
+    "is_peak",
+    "geo_density",
+    "corridor_incident_count",
+    "corridor_closure_rate",
+    "corridor_high_priority_rate"
+  ],
+  "all_features": [
+    "event_type",
+    "event_cause_grouped",
+    "corridor_grouped",
+    "veh_type_clean",
+    "latitude",
+    "longitude",
+    "hour",
+    "day_of_week",
+    "month",
+    "is_weekend",
+    "is_peak",
+    "geo_density",
+    "corridor_incident_count",
+    "corridor_closure_rate",
+    "corridor_high_priority_rate"
+  ],
+  "cat_indices": [
+    0,
+    1,
+    2,
+    3
+  ]
+}

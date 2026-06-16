@@ -1,0 +1,35 @@
+{
+  "timestamp": "2026-06-16T11:16:00+05:30",
+  "moves": [
+    {
+      "file": "Astram event data_anonymized - Astram event data_anonymizedb40ac87.csv",
+      "from": "Gridlock_Round2/",
+      "to": "Gridlock_Round2/selected_theme/",
+      "reason": "Primary dataset for selected theme: Event-Driven Congestion"
+    },
+    {
+      "file": "f539cf08-dbec-46e0-852a-0d345d73c31e.png",
+      "from": "Gridlock_Round2/",
+      "to": "Gridlock_Round2/selected_theme/theme_event_congestion.png",
+      "reason": "Problem statement screenshot for selected theme"
+    },
+    {
+      "file": "jan to may police violation_anonymized791b166.csv",
+      "from": "Gridlock_Round2/",
+      "to": "Gridlock_Round2/archive_other_themes/parking/",
+      "reason": "Dataset for rejected Theme 1: Parking-Induced Congestion"
+    },
+    {
+      "file": "35a5dbf2-f824-486a-a6a0-409d786fbc66.png",
+      "from": "Gridlock_Round2/",
+      "to": "Gridlock_Round2/archive_other_themes/parking/theme_parking_congestion.png",
+      "reason": "Problem statement screenshot for rejected Theme 1"
+    },
+    {
+      "file": "10d368cb-b6a2-413b-b379-02e1170b89c7.png",
+      "from": "Gridlock_Round2/",
+      "to": "Gridlock_Round2/archive_other_themes/computer_vision/theme_cv_violations.png",
+      "reason": "Problem statement screenshot for rejected Theme 3"
+    }
+  ]
+}
