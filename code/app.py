@@ -29,7 +29,8 @@ st.set_page_config(
 # ===================== CUSTOM CSS =====================
 st.markdown("""
 <style>
-    .stApp { background-color: #0e1117; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+    .stApp { background-color: #0e1117; font-family: 'Inter', sans-serif; }
 
     .metric-card {
         background: linear-gradient(135deg, #1a1f2e 0%, #252b3b 100%);
@@ -38,6 +39,11 @@ st.markdown("""
         padding: 20px;
         margin: 8px 0;
         text-align: center;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .metric-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.15);
     }
     .metric-value {
         font-size: 2.2em;
@@ -72,7 +78,9 @@ st.markdown("""
         padding: 16px;
         margin: 8px 0;
         border-left: 4px solid #667eea;
+        transition: border-color 0.2s;
     }
+    .incident-card:hover { border-left-color: #764ba2; }
 
     .risk-high { color: #fc5c65; font-weight: 700; }
     .risk-medium { color: #f7b731; font-weight: 700; }
@@ -85,9 +93,22 @@ st.markdown("""
         padding: 10px 16px;
         overflow: hidden;
         white-space: nowrap;
+        position: relative;
+    }
+    .live-feed::before {
+        content: '🔴 LIVE';
+        position: absolute; left: 8px; top: 50%; transform: translateY(-50%);
+        background: #fc5c65; color: white; padding: 2px 8px; border-radius: 4px;
+        font-size: 0.7em; font-weight: 700; z-index: 2;
+        animation: pulse-badge 2s infinite;
+    }
+    @keyframes pulse-badge {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
     }
     .live-feed-inner {
         display: inline-block;
+        padding-left: 60px;
         animation: scroll-left 40s linear infinite;
     }
     @keyframes scroll-left {
@@ -102,6 +123,17 @@ st.markdown("""
         margin: 4px 0;
         border-left: 3px solid #667eea;
     }
+
+    .hero-card {
+        background: linear-gradient(135deg, rgba(102,126,234,0.12) 0%, rgba(118,75,162,0.08) 100%);
+        border: 1px solid rgba(102,126,234,0.3);
+        border-radius: 16px;
+        padding: 24px 28px;
+        margin-bottom: 20px;
+        backdrop-filter: blur(10px);
+    }
+    .hero-card h3 { margin: 0 0 8px; color: #e2e8f0; }
+    .hero-card p { color: #a0aec0; margin: 4px 0; font-size: 0.95em; }
 
     div[data-testid="stSidebar"] {
         background: linear-gradient(180deg, #0e1117 0%, #1a1f2e 100%);
@@ -276,17 +308,21 @@ def build_feature_row(cause, event_type, corridor, hour, dow, veh_type):
     geo_bin = f"{lat_bin}_{lon_bin}"
     geo_density = (df["geo_bin"] == geo_bin).sum() if "geo_bin" in df.columns else 1
 
+    is_peak = 1 if hour in [8, 9, 10, 17, 18, 19] else 0
+    cause_peak = f"{cause_grouped}_{is_peak}"
+
     return pd.DataFrame([{
         "event_type": event_type,
         "event_cause_grouped": cause_grouped,
         "corridor_grouped": corridor_grouped,
         "veh_type_clean": veh_clean,
+        "cause_peak_interaction": cause_peak,
         "latitude": lat, "longitude": lon,
         "hour": hour,
         "day_of_week": DOW_MAP.get(dow, 3),
         "month": 3,
         "is_weekend": 1 if DOW_MAP.get(dow, 3) >= 5 else 0,
-        "is_peak": 1 if hour in [8, 9, 10, 17, 18, 19] else 0,
+        "is_peak": is_peak,
         "geo_density": geo_density,
         "corridor_incident_count": corr_incidents,
         "corridor_closure_rate": corr_closure,
@@ -500,6 +536,22 @@ def get_copilot_answer(question, df_ref, ctx):
             answer += f"| {i+1} | {row['corridor']} | {row['risk_score']:.3f} | {int(row['total_incidents'])} | {row['closure_rate']:.0%} |\n"
         return answer
 
+    if "compare" in question_lower and any(w in question_lower for w in ["corridor", "road", "vs", "versus"]):
+        found = []
+        for _, row in corridor_risk.iterrows():
+            if row['corridor'].lower() in question_lower:
+                found.append(row)
+        if len(found) >= 2:
+            answer = "### Corridor Comparison\n\n| Metric | " + " | ".join(f['corridor'] for f in found[:2]) + " |\n|---|---|---|\n"
+            for metric in ['total_incidents', 'closure_rate', 'high_priority_pct', 'risk_score']:
+                label = metric.replace('_', ' ').title()
+                vals = []
+                for f in found[:2]:
+                    v = f[metric]
+                    vals.append(f"{v:.0%}" if 'rate' in metric or 'pct' in metric else (f"{v:.3f}" if 'score' in metric else str(int(v))))
+                answer += f"| {label} | " + " | ".join(vals) + " |\n"
+            return answer
+
     if any(w in question_lower for w in ["hour", "time", "peak", "when", "morning", "evening"]):
         hourly = df_ref.groupby("hour").size()
         peak_hour = hourly.idxmax()
@@ -617,6 +669,7 @@ if DATA_LOADED:
             "🧠 AI Traffic Copilot",
             "📈 ML Model Performance",
             "🔮 Incident Predictor",
+            "📑 Project Documentation",
         ])
 
         st.markdown("---")
@@ -628,59 +681,158 @@ if DATA_LOADED:
         st.caption("Flipkart Gridlock 2.0 | Event-Driven Congestion")
 
 
+def compute_corridor_risk(data):
+    if len(data) == 0:
+        return pd.DataFrame(columns=["corridor", "total_incidents", "closure_rate", "high_priority_pct", "risk_score"])
+    
+    corr_risk = data.groupby("corridor").agg(
+        total_incidents=("id", "count"),
+        closure_rate=("requires_road_closure", "mean"),
+        high_priority_pct=("priority_binary", "mean"),
+        lat=("latitude", "mean"),
+        lon=("longitude", "mean")
+    ).reset_index()
+    
+    max_incidents = corr_risk["total_incidents"].max()
+    max_incidents = max_incidents if max_incidents > 0 else 1
+    
+    corr_risk["risk_score"] = (
+        0.4 * corr_risk["total_incidents"] / max_incidents +
+        0.3 * corr_risk["closure_rate"] +
+        0.3 * corr_risk["high_priority_pct"]
+    )
+    return corr_risk.sort_values("risk_score", ascending=False)
+
+
 # ===================== PAGE: OPERATIONS DASHBOARD =====================
 if DATA_LOADED and page == "📊 Operations Dashboard":
     st.markdown("## 📊 Operations Command Dashboard")
-    st.caption("Real-time traffic incident intelligence for Bengaluru")
 
-    critical = df[(df["priority"] == "High") | (df["requires_road_closure"] == 1)].tail(12)
+    st.markdown("""
+    <div class="hero-card">
+        <h3>🚦 NammaTraffic — Bengaluru Traffic Incident Intelligence & Command Platform</h3>
+        <p>A proactive AI-powered command center that transforms how Bengaluru manages traffic incidents.
+        Instead of reactive phone-based dispatching, NammaTraffic <b>predicts</b> severity, <b>estimates</b>
+        road closure probability, <b>recommends</b> resources, and <b>learns</b> from every resolved incident.</p>
+        <p>📊 <b>8,173</b> real incidents · 🗺️ <b>22</b> corridors · 🤖 <b>3</b> ML models · 🧠 AI Copilot</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Filter controls
+    zones_list = ["All Zones"] + sorted([z for z in df["zone"].dropna().unique() if str(z).strip() != ""])
+    selected_zone = st.selectbox("🎯 Filter Platform by Bengaluru Police Zone", zones_list)
+    
+    # Filter dataset
+    if selected_zone != "All Zones":
+        df_dash = df[df["zone"] == selected_zone].copy()
+        corr_risk_dash = compute_corridor_risk(df_dash)
+    else:
+        df_dash = df.copy()
+        corr_risk_dash = corridor_risk.copy()
+
+    critical = df_dash[(df_dash["priority"] == "High") | (df_dash["requires_road_closure"] == 1)].tail(12)
     st.markdown("#### 🔴 Live Critical Incident Feed")
     st.markdown(get_live_feed_html(critical), unsafe_allow_html=True)
 
     col1, col2, col3, col4, col5 = st.columns(5)
-    active = (df["status"] == "active").sum()
-    closure_rate = df["requires_road_closure"].mean()
+    active = (df_dash["status"] == "active").sum()
+    closure_rate = df_dash["requires_road_closure"].mean()
     with col1:
-        st.markdown(f'<div class="metric-card"><div class="metric-value">{len(df):,}</div><div class="metric-label">Total Incidents</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-card"><div class="metric-value">{len(df_dash):,}</div><div class="metric-label">Total Incidents</div></div>', unsafe_allow_html=True)
     with col2:
-        st.markdown(f'<div class="metric-card"><div class="metric-value">{df["requires_road_closure"].sum():,}</div><div class="metric-label">Road Closures</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-card"><div class="metric-value">{df_dash["requires_road_closure"].sum():,}</div><div class="metric-label">Road Closures</div></div>', unsafe_allow_html=True)
     with col3:
         st.markdown(f'<div class="metric-card"><div class="metric-value">{closure_rate:.0%}</div><div class="metric-label">Closure Rate</div></div>', unsafe_allow_html=True)
     with col4:
-        st.markdown(f'<div class="metric-card"><div class="metric-value">{df["resolution_minutes"].median():.0f}m</div><div class="metric-label">Median Resolution</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-card"><div class="metric-value">{df_dash["resolution_minutes"].median():.0f}m</div><div class="metric-label">Median Resolution</div></div>', unsafe_allow_html=True)
     with col5:
         st.markdown(f'<div class="metric-card"><div class="metric-value">{active}</div><div class="metric-label">Active Now</div></div>', unsafe_allow_html=True)
 
-    st.markdown("---")
+    # Dynamic Key Insights Card
+    unplanned_dash = df_dash[df_dash["event_type"] == "unplanned"]
+    evening_peak_incidents = len(unplanned_dash[unplanned_dash["hour"].isin([17, 18, 19])])
+    total_unplanned = len(unplanned_dash) if len(unplanned_dash) > 0 else 1
+    evening_peak_pct = (evening_peak_incidents / total_unplanned) * 100
+
+    breakdowns_closure = len(df_dash[(df_dash["event_cause"] == "vehicle_breakdown") & (df_dash["requires_road_closure"] == 1)])
+    total_closures = len(df_dash[df_dash["requires_road_closure"] == 1]) if len(df_dash[df_dash["requires_road_closure"] == 1]) > 0 else 1
+    breakdown_closure_pct = (breakdowns_closure / total_closures) * 100
+
+    top_risk_text = "N/A"
+    if len(corr_risk_dash) > 0:
+        top_risk_row = corr_risk_dash.iloc[0]
+        top_risk_text = f"**{top_risk_row['corridor']}** (Risk Score: **{top_risk_row['risk_score']:.3f}**)"
+
+    st.markdown(f"""
+    <div class="hero-card" style="background: linear-gradient(135deg, #1b263b 0%, #0d1b2a 100%); border-color: #415a77; margin-top: 15px; margin-bottom: 25px;">
+        <h4 style="color: #e0e1dd; margin-top: 0;">💡 Proactive Command Key Insights ({selected_zone})</h4>
+        <ul style="color: #a3b18a; margin-bottom: 0; padding-left: 20px;">
+            <li>🌙 <b>Evening Peak Congestion:</b> Evening peak hours (17:00–19:00) account for <b>{evening_peak_pct:.1f}%</b> of unplanned incidents.</li>
+            <li>🚛 <b>Breakdown Hazard:</b> Vehicle breakdowns are responsible for <b>{breakdown_closure_pct:.1f}%</b> of all incidents requiring road closures.</li>
+            <li>🚨 <b>Critical Path:</b> Highest risk corridor is {top_risk_text}.</li>
+        </ul>
+    </div>
+    """, unsafe_allow_html=True)
+
     col_left, col_right = st.columns(2)
 
     with col_left:
         st.markdown("### Incidents by Cause")
-        cause_counts = df["event_cause"].value_counts().head(10)
+        cause_counts = df_dash["event_cause"].value_counts().head(10)
         fig = px.bar(x=cause_counts.values, y=cause_counts.index, orientation="h",
                      color=cause_counts.values, color_continuous_scale="Plasma",
                      labels={"x": "Count", "y": "Event Cause"})
         fig.update_layout(template="plotly_dark", height=400,
                           paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                           showlegend=False, coloraxis_showscale=False, yaxis=dict(autorange="reversed"))
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
     with col_right:
         st.markdown("### Hourly Incident Distribution")
-        hourly = df.groupby("hour").size().reset_index(name="count")
+        hourly = df_dash.groupby("hour").size().reset_index(name="count")
         fig = px.area(hourly, x="hour", y="count", color_discrete_sequence=["#667eea"],
                       labels={"hour": "Hour of Day", "count": "Incidents"})
         fig.update_layout(template="plotly_dark", height=400,
                           paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
     st.markdown("### 🚨 Corridor Risk Ranking")
-    risk_display = corridor_risk.head(15)[["corridor", "total_incidents", "closure_rate", "high_priority_pct", "risk_score"]].copy()
-    risk_display.columns = ["Corridor", "Incidents", "Closure Rate", "High Priority %", "Risk Score"]
-    risk_display["Closure Rate"] = risk_display["Closure Rate"].apply(lambda x: f"{x:.0%}")
-    risk_display["High Priority %"] = risk_display["High Priority %"].apply(lambda x: f"{x:.0%}")
-    risk_display["Risk Score"] = risk_display["Risk Score"].apply(lambda x: f"{x:.3f}")
-    st.dataframe(risk_display, use_container_width=True, hide_index=True)
+    if len(corr_risk_dash) > 0:
+        risk_display = corr_risk_dash.head(15)[["corridor", "total_incidents", "closure_rate", "high_priority_pct", "risk_score"]].copy()
+        risk_display.columns = ["Corridor", "Incidents", "Closure Rate", "High Priority %", "Risk Score"]
+        risk_display["Closure Rate"] = risk_display["Closure Rate"].apply(lambda x: f"{x:.0%}")
+        risk_display["High Priority %"] = risk_display["High Priority %"].apply(lambda x: f"{x:.0%}")
+        risk_display["Risk Score"] = risk_display["Risk Score"].apply(lambda x: f"{x:.3f}")
+        st.dataframe(risk_display, width="stretch", hide_index=True)
+    else:
+        st.info("No corridors with incidents recorded in this zone.")
+
+    # Zone-level breakdown donut
+    st.markdown("---")
+    col_zone, col_closure_cause = st.columns(2)
+    with col_zone:
+        st.markdown("### 🏙️ Incidents by Zone")
+        zone_data = df_dash[df_dash['zone'].notna()]['zone'].value_counts().reset_index()
+        zone_data.columns = ['Zone', 'Count']
+        fig_zone = px.pie(zone_data, names='Zone', values='Count', hole=0.45,
+                          color_discrete_sequence=px.colors.sequential.Plasma_r)
+        fig_zone.update_layout(template='plotly_dark', height=350,
+                               paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+        st.plotly_chart(fig_zone, width="stretch")
+
+    with col_closure_cause:
+        st.markdown("### 🚧 Road Closure by Event Cause")
+        cl_cause = df_dash.groupby('event_cause')['requires_road_closure'].mean().sort_values(ascending=False).head(10).reset_index()
+        cl_cause.columns = ['Cause', 'Closure Rate']
+        cl_cause['Cause'] = cl_cause['Cause'].str.replace('_', ' ').str.title()
+        fig_cl = px.bar(cl_cause, x='Closure Rate', y='Cause', orientation='h',
+                        color='Closure Rate', color_continuous_scale='Reds',
+                        labels={'Closure Rate': 'Closure Probability'})
+        fig_cl.update_layout(template='plotly_dark', height=350,
+                             paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                             yaxis=dict(autorange='reversed'), coloraxis_showscale=False)
+        fig_cl.update_traces(texttemplate='%{x:.0%}', textposition='outside')
+        st.plotly_chart(fig_cl, width="stretch")
 
     st.markdown("---")
     st.markdown("### 📚 Post-Event Learning & Analytics")
@@ -688,22 +840,25 @@ if DATA_LOADED and page == "📊 Operations Dashboard":
 
     with ana_col1:
         st.markdown("#### Fastest Police Stations (Median Resolution)")
-        ps = df[df["resolution_minutes"].notna()].groupby("police_station").agg(
+        ps = df_dash[df_dash["resolution_minutes"].notna()].groupby("police_station").agg(
             median_mins=("resolution_minutes", "median"), count=("id", "count"),
         ).reset_index()
         ps = ps[ps["count"] >= 15].sort_values("median_mins").head(10)
-        fig_ps = px.bar(ps, x="median_mins", y="police_station", orientation="h",
-                        color="median_mins", color_continuous_scale="Greens",
-                        labels={"median_mins": "Median Minutes", "police_station": "Station"})
-        fig_ps.update_layout(template="plotly_dark", height=380,
-                             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                             yaxis=dict(autorange="reversed"), coloraxis_showscale=False,
-                             title="Lower is Better")
-        st.plotly_chart(fig_ps, use_container_width=True)
+        if len(ps) > 0:
+            fig_ps = px.bar(ps, x="median_mins", y="police_station", orientation="h",
+                            color="median_mins", color_continuous_scale="Greens",
+                            labels={"median_mins": "Median Minutes", "police_station": "Station"})
+            fig_ps.update_layout(template="plotly_dark", height=380,
+                                 paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                                 yaxis=dict(autorange="reversed"), coloraxis_showscale=False,
+                                 title="Lower is Better")
+            st.plotly_chart(fig_ps, width="stretch")
+        else:
+            st.info("No police stations with >= 15 incidents in this zone.")
 
     with ana_col2:
         st.markdown("#### Incident Trend (Nov 2023 – Apr 2024)")
-        monthly = df.groupby("month").agg(
+        monthly = df_dash.groupby("month").agg(
             incidents=("id", "count"),
             closure_rate=("requires_road_closure", "mean"),
         ).reset_index()
@@ -720,7 +875,7 @@ if DATA_LOADED and page == "📊 Operations Dashboard":
             yaxis=dict(title="Incidents"), yaxis2=dict(title="Closure %", overlaying="y", side="right"),
             title="3-Month Incident & Closure Trend",
         )
-        st.plotly_chart(fig_trend, use_container_width=True)
+        st.plotly_chart(fig_trend, width="stretch")
 
 
 # ===================== PAGE: GIS RISK MAP =====================
@@ -731,7 +886,7 @@ elif DATA_LOADED and page == "🗺️ GIS Risk Map":
 
     st.markdown("## 🗺️ Geospatial Risk Intelligence Map")
 
-    map_type = st.radio("Map Layer", ["🔥 Heatmap", "📍 Incident Markers", "⭕ Hotspot Clusters"], horizontal=True)
+    map_type = st.radio("Map Layer", ["🔥 Heatmap", "📍 Incident Markers", "⭕ Hotspot Clusters", "🔮 Next-Hour Predicted Hotspots"], horizontal=True)
 
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -768,16 +923,53 @@ elif DATA_LOADED and page == "🗺️ GIS Risk Map":
     m = folium.Map(location=[12.9716, 77.5946], zoom_start=12, tiles="CartoDB dark_matter")
 
     legend_html = """
+    <style>
+    @keyframes pulse {
+        0% { transform: scale(0.8); opacity: 0.5; }
+        50% { transform: scale(1.3); opacity: 1; }
+        100% { transform: scale(0.8); opacity: 0.5; }
+    }
+    .pulsing-dot {
+        background-color: #fc5c65;
+        border-radius: 50%;
+        border: 2px solid #ffffff;
+        width: 14px;
+        height: 14px;
+        animation: pulse 1.2s infinite ease-in-out;
+        display: inline-block;
+    }
+    </style>
     <div style="position:fixed;bottom:30px;left:10px;z-index:9999;background:#1a1f2e;
                 border:1px solid #667eea;border-radius:8px;padding:12px;font-size:12px;color:#fff;">
     <b>Map Legend</b><br>
-    <span style="color:#fc5c65;">●</span> High Risk Corridor<br>
-    <span style="color:#f7b731;">●</span> Medium Risk<br>
-    <span style="color:#26de81;">●</span> Low Risk Hotspot<br>
-    <span style="color:#667eea;">●</span> High Priority Incident<br>
-    <span style="color:#45aaf2;">●</span> Low Priority Incident
+    <span class="pulsing-dot" style="vertical-align:middle;margin-right:5px;"></span> Recent Critical Incident (Pulse)<br>
+    <span style="color:#fc5c65;font-size:16px;line-height:10px;">▬</span> High Risk Corridor<br>
+    <span style="color:#f7b731;font-size:16px;line-height:10px;">▬</span> Medium Risk<br>
+    <span style="color:#26de81;font-size:16px;line-height:10px;">▬</span> Low Risk Hotspot<br>
+    <span style="color:#fc5c65;font-size:16px;line-height:10px;">●</span> Hotspot cent.<br>
+    <span style="color:#667eea;font-size:16px;line-height:10px;">●</span> High Priority Incident<br>
+    <span style="color:#45aaf2;font-size:16px;line-height:10px;">●</span> Low Priority Incident
     </div>"""
     m.get_root().html.add_child(folium.Element(legend_html))
+
+    # Add pulsing markers for the top 5 most recent critical incidents
+    recent_critical = df_hour[(df_hour["priority"] == "High") | (df_hour["requires_road_closure"] == 1)].tail(5)
+    for _, row in recent_critical.iterrows():
+        popup_html = (
+            f"<b>🚨 RECENT CRITICAL: {row.get('event_cause', 'N/A').replace('_', ' ').title()}</b><br>"
+            f"Corridor: {row.get('corridor', 'N/A')}<br>"
+            f"Priority: {row.get('priority', 'N/A')}<br>"
+            f"Road Closure: {'Yes' if row.get('requires_road_closure') == 1 else 'No'}"
+        )
+        folium.Marker(
+            [row["latitude"], row["longitude"]],
+            popup=folium.Popup(popup_html, max_width=300),
+            icon=folium.DivIcon(
+                html='<div class="pulsing-dot" style="box-shadow: 0 0 12px #fc5c65;"></div>',
+                icon_size=(14, 14),
+                icon_anchor=(7, 7)
+            )
+        ).add_to(m)
 
     if map_type == "🔥 Heatmap":
         heat_data = df_hour[["latitude", "longitude"]].dropna().values.tolist()
@@ -827,12 +1019,60 @@ elif DATA_LOADED and page == "🗺️ GIS Risk Map":
                 popup=f"Hotspot #{int(cluster['hotspot_cluster'])}",
             ).add_to(m)
 
+    elif map_type == "🔮 Next-Hour Predicted Hotspots":
+        st.info("🔮 Predicting spatial risk hotspots for the next hour based on corridor parameters and temporal trends...")
+        next_hour = (selected_hour + 1) % 24
+        
+        # Run prediction for each corridor
+        for _, cr in corridor_risk.iterrows():
+            # Predict for the most common cause in this corridor
+            corr_incidents_data = df[df["corridor"] == cr["corridor"]]
+            if len(corr_incidents_data) == 0:
+                continue
+            top_cause = corr_incidents_data["event_cause"].mode()[0]
+            
+            # Predict
+            pred = predict_incident(
+                cause=top_cause,
+                event_type="unplanned",
+                corridor=cr["corridor"],
+                hour=next_hour,
+                dow=df["day_of_week"].mode()[0],
+                veh_type="unknown"
+            )
+            
+            risk_score = pred["closure_prob"]
+            if risk_score > 0.15: # only show if closure risk > 15%
+                radius = int(risk_score * 800)
+                color = "#fc5c65" if risk_score > 0.3 else "#f7b731"
+                folium.Circle(
+                    [cr["lat"], cr["lon"]],
+                    radius=radius,
+                    popup=(
+                        f"<b>🔮 Next-Hour Prediction: {cr['corridor']}</b><br>"
+                        f"Hour: {next_hour:02d}:00<br>"
+                        f"Top Cause: {top_cause.replace('_', ' ').title()}<br>"
+                        f"Predicted Road Closure Risk: {risk_score:.1%}<br>"
+                        f"Estimated Resolution: {pred['resolution_mins']:.0f} mins"
+                    ),
+                    color=color, fill=True, fill_opacity=0.4, weight=2,
+                    tooltip=f"{cr['corridor']} (Risk: {risk_score:.0%})"
+                ).add_to(m)
+
     if show_corridors:
         for _, cr in corridor_risk.head(12).iterrows():
             pts = df[df["corridor"] == cr["corridor"]][["latitude", "longitude"]].dropna()
             if len(pts) < 3:
                 continue
-            coords = pts.sample(min(40, len(pts)), random_state=42).sort_values("latitude").values.tolist()
+            
+            # Smart coordinate sorting based on aspect ratio
+            lat_range = pts["latitude"].max() - pts["latitude"].min()
+            lon_range = pts["longitude"].max() - pts["longitude"].min()
+            if lon_range > lat_range:
+                coords = pts.sample(min(40, len(pts)), random_state=42).sort_values("longitude").values.tolist()
+            else:
+                coords = pts.sample(min(40, len(pts)), random_state=42).sort_values("latitude").values.tolist()
+                
             color = risk_color(cr["risk_score"])
             folium.PolyLine(
                 coords, color=color, weight=4, opacity=0.75,
@@ -863,15 +1103,16 @@ elif DATA_LOADED and page == "🔍 Incident Explorer":
     available_cols = [c for c in display_cols if c in df_filtered.columns]
 
     st.markdown(f"### {len(df_filtered):,} Incidents Found")
-    st.dataframe(df_filtered[available_cols].head(100), use_container_width=True, hide_index=True)
+    st.dataframe(df_filtered[available_cols].head(100), width="stretch", hide_index=True)
 
     st.markdown("---")
     st.markdown("### 🔗 Similar Incident Search")
     incident_id = st.selectbox("Select Incident ID", df_filtered["id"].head(200).tolist())
 
     if st.button("🔍 Find Similar Incidents", type="primary"):
-        idx = df[df["id"] == incident_id].index[0]
-        similar_idx, scores = find_similar_incidents(idx, top_k=5)
+        with st.spinner("🔍 Querying historical database for similar traffic patterns..."):
+            idx = df[df["id"] == incident_id].index[0]
+            similar_idx, scores = find_similar_incidents(idx, top_k=5)
         source = df.iloc[idx]
         st.markdown(
             f'<div class="incident-card"><b>Source: {source["id"]}</b><br>'
@@ -915,13 +1156,13 @@ elif DATA_LOADED and page == "🧠 AI Traffic Copilot":
             if st.button(label, use_container_width=True):
                 st.session_state.pending_q = q
 
-    for msg in st.session_state.messages:
+    for idx, msg in enumerate(st.session_state.messages):
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
             if msg.get("chart_query"):
                 chart = copilot_chart(msg["chart_query"])
                 if chart:
-                    st.plotly_chart(chart, use_container_width=True)
+                    st.plotly_chart(chart, width="stretch", key=f"hist_chart_{idx}")
 
     prompt = st.session_state.pop("pending_q", None)
     if prompt is None:
@@ -944,7 +1185,7 @@ elif DATA_LOADED and page == "🧠 AI Traffic Copilot":
 
                 st.markdown(answer)
                 if chart:
-                    st.plotly_chart(chart, use_container_width=True)
+                    st.plotly_chart(chart, width="stretch", key=f"new_chart_{len(st.session_state.messages)}")
 
                 chart_query = prompt.lower() if chart else None
                 st.session_state.messages.append({"role": "assistant", "content": answer, "chart_query": chart_query})
@@ -984,7 +1225,7 @@ elif DATA_LOADED and page == "📈 ML Model Performance":
                               template="plotly_dark", height=300,
                               paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                               yaxis_title=model_data["metric"])
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
         st.markdown("---")
 
 
@@ -1028,29 +1269,75 @@ elif DATA_LOADED and page == "🔮 Incident Predictor":
 
     with col2:
         if st.button("⚡ Predict", type="primary", use_container_width=True):
-            preds = predict_incident(pred_cause, pred_type, pred_corridor, pred_hour, pred_dow, pred_veh)
-            severity = preds["severity"]
-            closure_prob = preds["closure_prob"]
-            median_res = preds["resolution_mins"]
-            sev_conf = preds["severity_prob"]
-            diversion_prob = max(closure_prob, preds["hist_closure"])
-            resources = estimate_resources(pred_cause, severity.replace("HIGH", "High").replace("LOW", "Low"), diversion_prob)
-            sev_class = "severity-high" if severity == "HIGH" else "severity-low"
+            with st.spinner("🔮 Calculating proactive ML predictions..."):
+                preds = predict_incident(pred_cause, pred_type, pred_corridor, pred_hour, pred_dow, pred_veh)
+                severity = preds["severity"]
+                closure_prob = preds["closure_prob"]
+                median_res = preds["resolution_mins"]
+                sev_conf = preds["severity_prob"]
+                diversion_prob = max(closure_prob, preds["hist_closure"])
+                resources = estimate_resources(pred_cause, severity.replace("HIGH", "High").replace("LOW", "Low"), diversion_prob)
+                sev_class = "severity-high" if severity == "HIGH" else "severity-low"
 
             st.markdown("### 🎯 Prediction Results")
-            st.markdown(
-                f'<div class="incident-card"><h4>Severity: <span class="{sev_class}">{severity}</span></h4>'
-                f'<p>Confidence: {sev_conf:.0%}</p></div>',
-                unsafe_allow_html=True,
-            )
 
-            pcol1, pcol2 = st.columns(2)
-            with pcol1:
-                st.metric("🚧 Road Closure Probability", f"{closure_prob:.0%}")
-                st.metric("⏱️ Est. Resolution Time", f"{median_res:.0f} min")
-            with pcol2:
-                st.metric("👮 Officers Needed", resources["officers"])
-                st.metric("🚧 Barricades", resources["barricades"])
+            gauge_col1, gauge_col2, gauge_col3 = st.columns(3)
+            with gauge_col1:
+                sev_color = "#fc5c65" if severity == "HIGH" else "#45aaf2"
+                fig_sev = go.Figure(go.Indicator(
+                    mode="gauge+number",
+                    value=sev_conf * 100,
+                    title={"text": f"Severity: {severity}", "font": {"size": 16, "color": "#e2e8f0"}},
+                    number={"suffix": "%", "font": {"color": sev_color}},
+                    gauge={
+                        "axis": {"range": [0, 100], "tickcolor": "#4a5568"},
+                        "bar": {"color": sev_color},
+                        "bgcolor": "#1a1f2e",
+                        "bordercolor": "#2d3748",
+                        "steps": [
+                            {"range": [0, 50], "color": "#252b3b"},
+                            {"range": [50, 100], "color": "#1e2538"},
+                        ],
+                    },
+                ))
+                fig_sev.update_layout(height=220, paper_bgcolor="rgba(0,0,0,0)", font={"color": "#e2e8f0"}, margin=dict(t=60, b=10, l=20, r=20))
+                st.plotly_chart(fig_sev, width="stretch")
+
+            with gauge_col2:
+                cl_color = "#fc5c65" if closure_prob > 0.3 else "#f7b731" if closure_prob > 0.1 else "#26de81"
+                fig_cl = go.Figure(go.Indicator(
+                    mode="gauge+number",
+                    value=closure_prob * 100,
+                    title={"text": "Road Closure Risk", "font": {"size": 16, "color": "#e2e8f0"}},
+                    number={"suffix": "%", "font": {"color": cl_color}},
+                    gauge={
+                        "axis": {"range": [0, 100], "tickcolor": "#4a5568"},
+                        "bar": {"color": cl_color},
+                        "bgcolor": "#1a1f2e",
+                        "bordercolor": "#2d3748",
+                        "steps": [
+                            {"range": [0, 30], "color": "#1a2e1a"},
+                            {"range": [30, 70], "color": "#2e2a1a"},
+                            {"range": [70, 100], "color": "#2e1a1a"},
+                        ],
+                    },
+                ))
+                fig_cl.update_layout(height=220, paper_bgcolor="rgba(0,0,0,0)", font={"color": "#e2e8f0"}, margin=dict(t=60, b=10, l=20, r=20))
+                st.plotly_chart(fig_cl, width="stretch")
+
+            with gauge_col3:
+                st.markdown(f"""<div class="metric-card" style="margin-top:20px;">
+                    <div class="metric-value">⏱️ {median_res:.0f}</div>
+                    <div class="metric-label">Est. Resolution (min)</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">👮 {resources['officers']}</div>
+                    <div class="metric-label">Officers Needed</div>
+                </div>""", unsafe_allow_html=True)
+                if resources["tow_truck"]:
+                    st.markdown('<div class="metric-card"><div class="metric-value">🚛</div><div class="metric-label">Tow Truck Needed</div></div>', unsafe_allow_html=True)
+                if resources["ambulance"]:
+                    st.markdown('<div class="metric-card"><div class="metric-value">🚑</div><div class="metric-label">Ambulance Alert</div></div>', unsafe_allow_html=True)
 
             st.markdown("### 🔍 Why This Prediction?")
             summary, factors = explain_prediction(pred_cause, pred_corridor, pred_hour, pred_dow, closure_prob, severity)
@@ -1078,19 +1365,197 @@ elif DATA_LOADED and page == "🔮 Incident Predictor":
                             f"closure rate {alt['closure_rate']:.0%} ({int(alt['total_incidents'])} historical incidents)"
                         )
 
-            st.markdown("### 📋 Resource Recommendation")
-            rec = [f"- 👮 Deploy **{resources['officers']} officers**", f"- 🚧 Set up **{resources['barricades']} barricades**"]
+            st.markdown("### 📋 Resource Recommendation Grid")
+            tow_truck_html = ""
             if resources["tow_truck"]:
-                rec.append("- 🚛 **Dispatch tow truck**")
+                tow_truck_html = """
+                <div style="flex: 1 1 180px; padding: 15px; background: linear-gradient(135deg, #3b1373 0%, #5c20ad 100%); border-radius: 8px; border: 1px solid #7e57c2; text-align: center; color: white;">
+                    <div style="font-size: 2em; margin-bottom: 5px;">🚛</div>
+                    <strong>Tow Truck</strong><br>
+                    <span style="font-size:0.8em; opacity:0.8;">Required for vehicle clearance</span>
+                </div>
+                """
+            
+            ambulance_html = ""
             if resources["ambulance"]:
-                rec.append("- 🚑 **Alert ambulance**")
-            st.markdown("\n".join(rec))
+                ambulance_html = """
+                <div style="flex: 1 1 180px; padding: 15px; background: linear-gradient(135deg, #781313 0%, #ad2020 100%); border-radius: 8px; border: 1px solid #e57373; text-align: center; color: white;">
+                    <div style="font-size: 2em; margin-bottom: 5px;">🚑</div>
+                    <strong>Ambulance Alert</strong><br>
+                    <span style="font-size:0.8em; opacity:0.8;">Medical response team notified</span>
+                </div>
+                """
+
+            st.markdown(f"""
+            <div style="display:flex; flex-wrap:wrap; gap:10px; margin-top: 10px; margin-bottom: 20px;">
+                <div style="flex: 1 1 180px; padding: 15px; background: linear-gradient(135deg, #132a73 0%, #2045ad 100%); border-radius: 8px; border: 1px solid #4a90e2; text-align: center; color: white;">
+                    <div style="font-size: 2em; margin-bottom: 5px;">👮</div>
+                    <strong>{resources['officers']} Officers</strong><br>
+                    <span style="font-size:0.8em; opacity:0.8;">On-site traffic control & override</span>
+                </div>
+                <div style="flex: 1 1 180px; padding: 15px; background: linear-gradient(135deg, #734513 0%, #ad7020 100%); border-radius: 8px; border: 1px solid #f5a623; text-align: center; color: white;">
+                    <div style="font-size: 2em; margin-bottom: 5px;">🚧</div>
+                    <strong>{resources['barricades']} Barricades</strong><br>
+                    <span style="font-size:0.8em; opacity:0.8;">Road closure & perimeter boundaries</span>
+                </div>
+                {tow_truck_html}
+                {ambulance_html}
+            </div>
+            """, unsafe_allow_html=True)
+
+            # Response Timeline
+            dispatch_time = max(5, median_res * 0.15)
+            arrival_time = max(10, median_res * 0.3)
+            
+            st.markdown(f"""
+            <div style="margin-top:20px; margin-bottom:25px; padding: 20px; background:#1a1f2e; border: 1px solid #2d3748; border-radius:12px;">
+                <h4 style="color:#e2e8f0; margin-top:0; margin-bottom: 15px;">⏱️ Predicted Response Timeline Milestones</h4>
+                <div style="position:relative; padding-left: 20px; border-left: 2px solid #667eea; margin-left: 10px;">
+                    <div style="margin-bottom: 15px; position:relative;">
+                        <div style="position:absolute; left:-27px; top:3px; background:#667eea; border-radius:50%; width:12px; height:12px;"></div>
+                        <strong style="color:#ffffff;">T + 0 min: Incident Detected</strong><br>
+                        <span style="color:#a0aec0; font-size:0.85em;">Logged in Astram & NammaTraffic Command Platform</span>
+                    </div>
+                    <div style="margin-bottom: 15px; position:relative;">
+                        <div style="position:absolute; left:-27px; top:3px; background:#667eea; border-radius:50%; width:12px; height:12px;"></div>
+                        <strong style="color:#ffffff;">T + {dispatch_time:.0f} min: Dispatch Dispatch</strong><br>
+                        <span style="color:#a0aec0; font-size:0.85em;">Dispatching {resources['officers']} officers & barricades</span>
+                    </div>
+                    <div style="margin-bottom: 15px; position:relative;">
+                        <div style="position:absolute; left:-27px; top:3px; background:#667eea; border-radius:50%; width:12px; height:12px;"></div>
+                        <strong style="color:#ffffff;">T + {arrival_time:.0f} min: Arrival & Setup</strong><br>
+                        <span style="color:#a0aec0; font-size:0.85em;">Scene setup, perimeter safety bounds, and active diversions</span>
+                    </div>
+                    <div style="position:relative;">
+                        <div style="position:absolute; left:-27px; top:3px; background:#26de81; border-radius:50%; width:12px; height:12px;"></div>
+                        <strong style="color:#26de81;">T + {median_res:.0f} min: Predicted Clearance & Resolution</strong><br>
+                        <span style="color:#a0aec0; font-size:0.85em;">Incident cleared from lane, normal flow restored</span>
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
             st.markdown("### 🔗 Similar Past Incidents")
             cause_data = df[df["event_cause"] == pred_cause]
             for _, row in cause_data.head(3).iterrows():
                 res_str = f"{row['resolution_minutes']:.0f} min" if pd.notna(row.get("resolution_minutes")) else "N/A"
                 st.markdown(f"- **{row['id']}** — {row['corridor']}, Resolution: {res_str}")
+
+
+# ===================== PAGE: PROJECT DOCUMENTATION =====================
+elif DATA_LOADED and page == "📑 Project Documentation":
+    st.markdown("## 📑 Project Documentation")
+    st.markdown("Technical depth for judges — architecture, ML results, data insights.")
+
+    st.markdown("### 🏗️ System Architecture")
+    st.markdown("""
+    <div class="hero-card">
+    <h4>NammaTraffic — End-to-End Architecture</h4>
+    <pre style="color: #a0aec0; font-size: 0.85em;">
+    ┌─────────────────────────────────────────────────────────────────┐
+    │                    ASTRAM EVENT DATA (CSV)                      │
+    │              8,173 incidents · 46 raw columns                    │
+    └───────────────────────┬─────────────────────────────────────────┘
+                            │
+                    ┌───────▼────────┐
+                    │  DATA PIPELINE  │  → Cleaning, Feature Engineering
+                    │ train_pipeline  │  → TF-IDF, Geo-Density, Temporal
+                    └───────┬────────┘
+                            │
+            ┌───────────────┼───────────────┐
+            ▼               ▼               ▼
+    ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
+    │  CatBoost    │ │  LightGBM   │ │  CatBoost    │
+    │  Severity    │ │  Closure    │ │  Resolution  │
+    │  F1=0.999    │ │  AUC=0.796  │ │  Regressor   │
+    └──────┬───────┘ └──────┬───────┘ └──────┬───────┘
+           │                │                │
+           └────────────────┼────────────────┘
+                            │
+                    ┌───────▼────────┐
+                    │   STREAMLIT    │  ← 6-Page Command Center
+                    │   app.py       │  ← Maps, Copilot, Predictor
+                    └────────────────┘
+    </pre>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("---")
+    st.markdown("### 🤖 ML Model Performance Summary")
+
+    perf_data = []
+    for model_name, md in model_perf.items():
+        perf_data.append({
+            "Model": model_name.replace('_', ' ').title(),
+            "Algorithm": md['type'],
+            "Target": md['target'],
+            "Metric": md['metric'],
+            "CV Mean": f"{md['cv_mean']}",
+            "CV Std": f"±{md['cv_std']}",
+        })
+    st.dataframe(pd.DataFrame(perf_data), width="stretch", hide_index=True)
+
+    st.markdown("---")
+    st.markdown("### 📊 Dataset Statistics")
+
+    stat_col1, stat_col2 = st.columns(2)
+    with stat_col1:
+        st.markdown(f"""
+        | Statistic | Value |
+        |---|---|
+        | Total Incidents | **{len(df):,}** |
+        | Time Range | Nov 2023 – Apr 2024 |
+        | Corridors | **{df['corridor'].nunique()}** |
+        | Zones | **{df['zone'].nunique() if 'zone' in df.columns else 'N/A'}** |
+        | Police Stations | **{df['police_station'].nunique()}** |
+        | Junctions | **{df['junction'].nunique() if 'junction' in df.columns else 'N/A'}** |
+        """)
+    with stat_col2:
+        st.markdown(f"""
+        | Statistic | Value |
+        |---|---|
+        | Unplanned Events | **{(df['event_type']=='unplanned').sum():,}** ({(df['event_type']=='unplanned').mean():.0%}) |
+        | High Priority | **{df['priority_binary'].sum():,}** ({df['priority_binary'].mean():.0%}) |
+        | Road Closures | **{df['requires_road_closure'].sum():,}** ({df['requires_road_closure'].mean():.0%}) |
+        | Median Resolution | **{df['resolution_minutes'].median():.0f} min** |
+        | Event Causes | **{df['event_cause'].nunique()}** types |
+        | Resolution Data | **{df['resolution_minutes'].notna().sum():,}** ({df['resolution_minutes'].notna().mean():.0%}) |
+        """)
+
+    st.markdown("---")
+    st.markdown("### 🔧 Feature Engineering Catalog")
+    st.markdown("""
+    | Feature | Type | Source | Description |
+    |---|---|---|---|
+    | `event_cause_grouped` | Categorical | Derived | Rare causes (< 50 incidents) grouped as `other_rare` |
+    | `corridor_grouped` | Categorical | Derived | Rare corridors (< 30 incidents) grouped |
+    | `veh_type_clean` | Categorical | Derived | Cleaned vehicle type with rare grouping |
+    | `hour`, `day_of_week`, `month` | Numerical | Extracted | From `start_datetime` |
+    | `is_weekend` | Binary | Derived | 1 if Saturday/Sunday |
+    | `is_peak` | Binary | Derived | 1 if hour in [8-10, 17-19] |
+    | `geo_density` | Numerical | Spatial | Count of incidents in same geo-bin (0.003° grid) |
+    | `corridor_incident_count` | Numerical | Aggregated | Historical incident count per corridor |
+    | `corridor_closure_rate` | Numerical | Aggregated | Historical road closure rate per corridor |
+    | `corridor_high_priority_rate` | Numerical | Aggregated | Historical high-priority rate per corridor |
+    | `hotspot_cluster` | Categorical | DBSCAN | Spatial cluster ID (-1 = noise) |
+    | TF-IDF features | Numerical | NLP | Top-K terms from incident descriptions |
+    """)
+
+    st.markdown("---")
+    st.markdown("### 📄 Reports & Documentation")
+    st.markdown("24 comprehensive reports covering every aspect of the project:")
+
+    report_categories = {
+        "📋 Product & Strategy": ["product_definition.md", "theme_scoring.md", "demo_script.md", "final_submission_checklist.md"],
+        "📊 Data Analysis": ["dataset_overview.md", "data_quality_report.md", "missing_values_report.md", "geography_report.md", "temporal_report.md"],
+        "🏗️ Architecture": ["architecture_overview.md", "frontend_architecture.md", "backend_architecture.md", "database_schema.md", "api_design.md", "deployment_architecture.md", "gis_architecture.md"],
+        "🤖 ML & AI": ["ml_architecture.md", "modeling_strategy.md", "target_definition.md", "feature_catalog.md", "ai_copilot_design.md"],
+        "📅 Planning": ["24_hour_plan.md", "48_hour_plan.md", "final_judge_review.md"],
+    }
+    for category, files in report_categories.items():
+        with st.expander(category):
+            for f in files:
+                st.markdown(f"- `reports/{f}`")
 
 
 # ===================== FOOTER =====================

@@ -3,7 +3,8 @@
     "event_type",
     "event_cause_grouped",
     "corridor_grouped",
-    "veh_type_clean"
+    "veh_type_clean",
+    "cause_peak_interaction"
   ],
   "numerical_features": [
     "latitude",
@@ -23,6 +24,7 @@
     "event_cause_grouped",
     "corridor_grouped",
     "veh_type_clean",
+    "cause_peak_interaction",
     "latitude",
     "longitude",
     "hour",
@@ -39,6 +41,7 @@
     0,
     1,
     2,
-    3
+    3,
+    4
   ]
 }

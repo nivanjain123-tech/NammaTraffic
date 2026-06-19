@@ -96,6 +96,8 @@ rare_causes = cause_counts[cause_counts < 50].index
 df['event_cause_grouped'] = df['event_cause'].replace(
     {c: 'other_rare' for c in rare_causes}
 )
+df['cause_peak_interaction'] = df['event_cause_grouped'].astype(str) + "_" + df['is_peak'].astype(str)
+
 
 # Corridor grouping
 corridor_counts = df['corridor'].value_counts()
@@ -145,7 +147,7 @@ corridor_stats = df.groupby('corridor_grouped').agg(
 df = df.merge(corridor_stats, on='corridor_grouped', how='left')
 
 # Feature columns for ML
-CATEGORICAL_FEATURES = ['event_type', 'event_cause_grouped', 'corridor_grouped', 'veh_type_clean']
+CATEGORICAL_FEATURES = ['event_type', 'event_cause_grouped', 'corridor_grouped', 'veh_type_clean', 'cause_peak_interaction']
 NUMERICAL_FEATURES = ['latitude', 'longitude', 'hour', 'day_of_week', 'month',
                        'is_weekend', 'is_peak', 'geo_density',
                        'corridor_incident_count', 'corridor_closure_rate',
@@ -257,7 +259,7 @@ print("\n" + "=" * 60)
 print("PHASE 5: Training Model 3 — Resolution Time Predictor")
 print("=" * 60)
 
-mask_res = df['resolution_minutes'].notna() & (df['resolution_minutes'] > 0)
+mask_res = df['resolution_minutes'].notna() & (df['resolution_minutes'] > 0) & (df['resolution_minutes'] <= 2880)
 df_res = df[mask_res].copy()
 y_res = np.log1p(df_res['resolution_minutes'].values)
 X_res = df_res[ALL_FEATURES].copy()

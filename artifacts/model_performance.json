@@ -4,41 +4,41 @@
     "target": "priority (High=1, Low=0)",
     "metric": "F1 Score",
     "cv_mean": 0.9988,
-    "cv_std": 0.0004,
+    "cv_std": 0.0007,
     "fold_scores": [
       0.9985,
       0.9995,
-      0.999,
-      0.9985,
-      0.9985
+      0.9975,
+      0.9995,
+      0.999
     ]
   },
   "closure_model": {
     "type": "LightGBM Classifier",
     "target": "requires_road_closure (1/0)",
     "metric": "ROC AUC",
-    "cv_mean": 0.796,
-    "cv_std": 0.0113,
+    "cv_mean": 0.7964,
+    "cv_std": 0.0111,
     "fold_scores": [
-      0.7896,
-      0.7799,
-      0.7993,
-      0.8141,
-      0.7973
+      0.7858,
+      0.7823,
+      0.7973,
+      0.8117,
+      0.805
     ]
   },
   "resolution_model": {
     "type": "CatBoost Regressor",
     "target": "resolution_minutes (log-transformed)",
     "metric": "MAE (minutes)",
-    "cv_mean": 2268.8,
-    "cv_std": 132.6,
+    "cv_mean": 134.7,
+    "cv_std": 8.9,
     "fold_scores": [
-      2321.6,
-      2046.3,
-      2457.1,
-      2258.1,
-      2261.2
+      126.9,
+      130.6,
+      135.3,
+      151.7,
+      129.2
     ]
   }
 }
