@@ -238,7 +238,9 @@ def load_ml_models():
 
 
 try:
-    df = load_data()
+    if "live_df" not in st.session_state:
+        st.session_state.live_df = load_data()
+    df = st.session_state.live_df
     corridor_risk = load_corridor_risk()
     hotspot_clusters = load_hotspot_clusters()
     model_perf = load_model_performance()
@@ -678,6 +680,20 @@ if DATA_LOADED:
         st.metric("Active", f"{(df['status'] == 'active').sum():,}")
         st.metric("Road Closures", f"{df['requires_road_closure'].sum():,}")
         st.markdown("---")
+        
+        if st.button("📡 Simulate Live Stream"):
+            import random
+            new_row = df.iloc[-1:].copy()
+            new_row["id"] = f"EVT{random.randint(10000, 99999)}"
+            new_row["status"] = "active"
+            new_row["priority"] = "High"
+            new_row["requires_road_closure"] = 1 if random.random() > 0.5 else 0
+            new_row["start_datetime"] = pd.Timestamp.now(tz="UTC")
+            new_row["corridor"] = random.choice(df["corridor"].dropna().unique())
+            new_row["event_cause"] = random.choice(["accident", "vehicle_breakdown", "tree_fall"])
+            st.session_state.live_df = pd.concat([df, new_row], ignore_index=True)
+            st.rerun()
+
         st.caption("Flipkart Gridlock 2.0 | Event-Driven Congestion")
 
 
